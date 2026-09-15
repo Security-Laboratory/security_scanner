@@ -1,0 +1,12 @@
+{
+  "name": "security_scanner",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Scanner de segurança para APIs — audita JWT, cookies, HTTPS e simula ataques comuns",
+  "main": "index.js", 
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC"
+}
