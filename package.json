@@ -3,10 +3,17 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Scanner de segurança para APIs — audita JWT, cookies, HTTPS e simula ataques comuns",
-  "main": "index.js", 
+  "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "lint": "eslint ."
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0"
+  }
 }

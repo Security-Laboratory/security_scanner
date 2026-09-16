@@ -21,11 +21,13 @@ Cada falha é classificada por gravidade (`baixa`, `media`, `alta`, `critica`) e
 
 ```
 security_scanner/
-├── index.js         Orquestrador — carrega config, roda os scanners, imprime resumo
-├── config.js        Alvo do scan (baseUrl, rotas, credenciais)
-├── scanners/        Um arquivo por família de teste (rede, cookies, jwt, ataques)
+├── index.js            Orquestrador — carrega config, roda os scanners, imprime resumo
+├── config.js           Alvo do scan (baseUrl, rotas, credenciais)
+├── eslint.config.js    Regras de análise estática
+├── scanners/           Um arquivo por família de teste (rede, cookies, jwt, ataques)
 └── utils/
-    └── motor.js     Motor de pontuação e log colorido no terminal
+    ├── http.js         Dispatcher HTTP compartilhado por todos os scanners
+    └── motor.js        Motor de pontuação e log colorido no terminal
 ```
 
 ## Como rodar
@@ -33,11 +35,24 @@ security_scanner/
 Requisitos: Node.js 18+.
 
 ```bash
-cd security_scanner
-node index.js
+npm start          # roda o scanner uma vez
+npm run dev        # roda com --watch (reinicia ao editar)
+npm run lint       # verifica o código com ESLint
 ```
 
 Sem parâmetros: usa o alvo definido em `config.js` (por padrão, o `alvo_cobaia` local em `http://localhost:3000`).
+
+## Inspeção manual
+
+Pra ver a resposta HTTP crua de uma rota (headers, cookies, body) sem passar pelo scanner, use `curl.exe -i` direto no terminal do Windows (CMD):
+
+```bash
+curl.exe -i -X POST http://localhost:3000/login -H "Content-Type: application/json" -d "{\"usuario\":\"admin\",\"senha\":\"123456\"}"
+```
+
+O flag `-i` inclui os headers da resposta. Você vê `Set-Cookie`, `X-Powered-By`, status code, tudo. Útil pra debug ou pra confirmar na mão o que o scanner detectou.
+
+No PowerShell, use `curl.exe` explícito (o `curl` sozinho é apelido pro `Invoke-WebRequest`, sintaxe diferente).
 
 ## Configurar um alvo diferente
 
@@ -58,7 +73,7 @@ const ALVO = {
 ## Roadmap
 
 - [x] **Fase 1** — Esqueleto, config, motor de pontuação
-- [ ] **Fase 2** — Auditoria de rede e cookies (HTTPS, `Set-Cookie`)
+- [x] **Fase 2** — Auditoria de rede e cookies (HTTPS, `Set-Cookie`)
 - [ ] **Fase 3** — Decodificação e validação de JWT (`.split('.')`, Base64URL, claims)
 - [ ] **Fase 4** — Simulador de exploits (`alg:none`, brute-force HMAC)
 - [ ] **Fase 5** — Consolidação de score e geração de relatório (Markdown / JSON)
