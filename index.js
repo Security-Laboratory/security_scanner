@@ -5,6 +5,7 @@ import ALVO from './config.js';
 import { criarMotor } from './utils/motor.js';
 import { auditarRede } from './scanners/rede.js';
 import { auditarCookies } from './scanners/cookies.js';
+import { auditarJWT } from './scanners/jwt.js';
 
 const { baseUrl, rotas } = ALVO;
 
@@ -27,8 +28,10 @@ await auditarRede(ALVO, motor);
 // Fase 2 (Passo 2.3): cookies do login
 await auditarCookies(ALVO, motor);
 
-// Nas próximas fases:
-//   await auditarJWT(ALVO, motor);
+// Fase 3: JWT — quebra, decodificação Base64URL, validação de claims
+await auditarJWT(ALVO, motor);
+
+// Próxima fase:
 //   await simularAtaques(ALVO, motor);
 
 motor.resumo();
