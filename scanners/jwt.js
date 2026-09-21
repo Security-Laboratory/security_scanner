@@ -19,7 +19,6 @@ import { coletarResposta } from '../utils/http.js';
  * antes de passar pro Buffer, que só entende Base64 padrão.
  */
 function decodificarBase64Url(str) {
-	console.log('token bruto:', str);
 	// 1. Reverte as substituições URL-safe
 	let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
 
@@ -42,7 +41,6 @@ function decodificarBase64Url(str) {
  * Decodifica header e payload (que são JSON) e devolve a assinatura crua.
  */
 function quebrarJWT(token) {
-	console.log('token pos decodificacao:', token);
 	const partes = token.split('.');
 	if (partes.length !== 3) {
 		throw new Error(`Token deveria ter 3 partes, tem ${partes.length}`);

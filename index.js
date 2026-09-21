@@ -6,6 +6,7 @@ import { criarMotor } from './utils/motor.js';
 import { auditarRede } from './scanners/rede.js';
 import { auditarCookies } from './scanners/cookies.js';
 import { auditarJWT } from './scanners/jwt.js';
+import { simularAtaques } from './scanners/ataques.js';
 
 const { baseUrl, rotas } = ALVO;
 
@@ -31,7 +32,7 @@ await auditarCookies(ALVO, motor);
 // Fase 3: JWT — quebra, decodificação Base64URL, validação de claims
 await auditarJWT(ALVO, motor);
 
-// Próxima fase:
-//   await simularAtaques(ALVO, motor);
+// Fase 4: ataques ativos — alg:none bypass e brute-force HMAC
+await simularAtaques(ALVO, motor);
 
 motor.resumo();
