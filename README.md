@@ -24,10 +24,18 @@ security_scanner/
 ├── index.js            Orquestrador — carrega config, roda os scanners, imprime resumo
 ├── config.js           Alvo do scan (baseUrl, rotas, credenciais)
 ├── eslint.config.js    Regras de análise estática
-├── scanners/           Um arquivo por família de teste (rede, cookies, jwt, ataques)
-└── utils/
-    ├── http.js         Dispatcher HTTP compartilhado por todos os scanners
-    └── motor.js        Motor de pontuação e log colorido no terminal
+├── scanners/           Um arquivo por família de teste
+│   ├── rede.js         Testes de HTTPS, HSTS, CSP, x-powered-by
+│   ├── cookies.js      HttpOnly, Secure, SameSite dos cookies de login
+│   ├── jwt.js          Quebra o token, valida alg, exp, iat, iss, aud
+│   └── ataques.js      alg:none forjado + brute-force HMAC
+├── utils/
+│   ├── http.js         Dispatcher HTTP compartilhado por todos os scanners
+│   ├── motor.js        Motor de pontuação e log colorido no terminal
+│   ├── wordlist.js     Chaves comuns pra brute-force
+│   ├── remediacoes.js  Textos de "como corrigir" por finding ID
+│   └── relatorio.js    Gera .md + .json em relatorios/
+└── relatorios/         (git-ignored) Saída de cada scan, timestamp no nome
 ```
 
 ## Como rodar
@@ -74,9 +82,17 @@ const ALVO = {
 
 - [x] **Fase 1** — Esqueleto, config, motor de pontuação
 - [x] **Fase 2** — Auditoria de rede e cookies (HTTPS, `Set-Cookie`)
-- [ ] **Fase 3** — Decodificação e validação de JWT (`.split('.')`, Base64URL, claims)
-- [ ] **Fase 4** — Simulador de exploits (`alg:none`, brute-force HMAC)
-- [ ] **Fase 5** — Consolidação de score e geração de relatório (Markdown / JSON)
+- [x] **Fase 3** — Decodificação e validação de JWT (`.split('.')`, Base64URL, claims)
+- [x] **Fase 4** — Simulador de exploits (`alg:none`, brute-force HMAC)
+- [x] **Fase 5** — Consolidação de score e geração de relatório (Markdown / JSON)
+
+### Expansões possíveis
+
+- [ ] Ataque de confusão de algoritmo (RS256 ↔ HS256)
+- [ ] Injeção via `kid`, `jku`, `x5u`
+- [ ] Rate limiting no `/login`
+- [ ] CORS misconfig
+- [ ] Camada TLS: cifras aceitas, cadeia de certificados
 
 ## Aviso legal
 
