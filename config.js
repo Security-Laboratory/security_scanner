@@ -7,8 +7,9 @@ const ALVO = {
   baseUrl: 'http://localhost:3000',
 
   rotas: {
-    login: '/login',       // POST { usuario, senha } → devolve JWT
-    refresh: '/refresh',   // POST usando refresh cookie → devolve novo JWT
+    login: '/login',       // POST { usuario, senha } → devolve JWT + cookie de refresh
+    refresh: '/refresh',   // POST usando refresh cookie → devolve novo JWT + rotaciona refresh
+    logout: '/logout',     // POST → invalida o refresh cookie
     protegida: '/perfil'   // GET com Authorization: Bearer <jwt> → dados do usuário
   },
 

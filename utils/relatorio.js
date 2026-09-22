@@ -16,15 +16,6 @@ const ICONE_GRAVIDADE = {
 };
 
 /**
- * Formata um timestamp legível pra nome de arquivo: 2026-09-21_193512
- */
-function timestampArquivo() {
-	const d = new Date();
-	const pad = (n) => String(n).padStart(2, '0');
-	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-}
-
-/**
  * Timestamp humano: 2026-09-21 19:35:12
  */
 function timestampHumano() {

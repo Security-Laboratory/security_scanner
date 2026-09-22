@@ -216,6 +216,21 @@ async function auditarJWT(alvo, motor) {
 			: 'Sem iat, não dá pra medir a idade do token.',
 	});
 
+	// ─── 9b. Claim nbf presente e coerente? ────────────────
+	// nbf (not before): servidor não deve aceitar antes desse timestamp.
+	// Boa prática defensiva contra tokens pré-emitidos que vazam antes do horário.
+	const temNbf = typeof payload.nbf === 'number';
+	motor.registrar({
+		id: 'jwt-nbf',
+		categoria: 'jwt',
+		descricao: 'Token tem claim nbf (not before)',
+		gravidade: 'baixa',
+		passou: temNbf,
+		detalhes: temNbf
+			? undefined
+			: 'Sem nbf, servidor não sabe a partir de quando o token começa a valer.',
+	});
+
 	// ─── 10. Claims iss e aud (recomendação de boas práticas) ─
 	// iss = quem emitiu, aud = pra quem se destina. Ausência não é falha
 	// crítica, mas é indicador de maturidade do sistema.

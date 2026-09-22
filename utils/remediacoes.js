@@ -78,6 +78,25 @@ const REMEDIACOES = {
 	'jwt-aud':
 		'Adicione `aud` (audience) no payload: `{ aud: \'sua-api\' }` e valide com `jwt.verify(token, secret, { audience: \'sua-api\' })`. Impede que um token emitido pra API A seja aceito pela API B.',
 
+	'jwt-nbf':
+		'Adicione `nbf` (not before) no payload: `{ nbf: Math.floor(Date.now()/1000) }`. Servidor deve validar com `jwt.verify(token, secret, { clockTolerance: 5 })` — token não é aceito antes desse instante.',
+
+	// ─── SESSÃO ──────────────────────────────────────────────────────
+	'sessao-preparacao':
+		'Login inicial pra testar refresh flow não funcionou. Verifique credenciais e disponibilidade do /login.',
+
+	'sessao-refresh-cookie':
+		'A rota de login não devolveu cookie de refresh. Padrão recomendado: cookie `HttpOnly; Secure; SameSite=Strict` com o refresh token.',
+
+	'sessao-refresh-funciona':
+		'/refresh não devolveu 2xx com cookie válido. Verifique o handler. Sem refresh funcionando, todo login precisa ser feito de novo quando o access expira.',
+
+	'sessao-refresh-rotacao':
+		'CRÍTICO: refresh não é rotacionado. Ao usar um refresh, invalide-o e emita um novo. Sem rotação, se o refresh vazar (log, XSS, MITM), o atacante usa até expirar.',
+
+	'sessao-logout-revoga':
+		'CRÍTICO: logout não invalida o refresh no servidor. Basta apagar o cookie do cliente não é suficiente — o token continua ativo. Marque o refresh como revogado numa tabela server-side (Redis ou banco).',
+
 	// ─── ATAQUES ─────────────────────────────────────────────────────
 	'ataque-none-preparacao':
 		'Não foi possível pegar um token válido pra montar o ataque. Verifique credenciais e rota de login.',

@@ -7,6 +7,7 @@ import { auditarRede } from './scanners/rede.js';
 import { auditarCookies } from './scanners/cookies.js';
 import { auditarJWT } from './scanners/jwt.js';
 import { simularAtaques } from './scanners/ataques.js';
+import { auditarSessao } from './scanners/sessao.js';
 import { gerarRelatorio } from './utils/relatorio.js';
 
 const { baseUrl, rotas } = ALVO;
@@ -35,6 +36,9 @@ await auditarJWT(ALVO, motor);
 
 // Fase 4: ataques ativos — alg:none bypass e brute-force HMAC
 await simularAtaques(ALVO, motor);
+
+// Fase 5 (expansão A): fluxo de sessão — refresh, rotação, logout
+await auditarSessao(ALVO, motor);
 
 // Fase 5: consolida resumo e gera relatórios .md + .json
 const resumo = motor.resumo();
