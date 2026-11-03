@@ -2,7 +2,7 @@
 // Loga na rota /login, lê os Set-Cookie que voltam e verifica se cada cookie
 // carrega os atributos de segurança: HttpOnly, Secure, SameSite.
 
-import { coletarResposta } from '../utils/http.js';
+import { fazerLogin } from '../utils/login.js';
 
 /**
  * Parseia uma string de Set-Cookie no formato:
@@ -44,11 +44,7 @@ async function auditarCookies(alvo, motor) {
 
 	let resposta;
 	try {
-		resposta = await coletarResposta(urlLogin, {
-			metodo: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(alvo.credenciais),
-		});
+		resposta = await fazerLogin(alvo);
 	} catch (erro) {
 		motor.registrar({
 			id: 'cookies-login-inatingivel',
@@ -77,15 +73,29 @@ async function auditarCookies(alvo, motor) {
 	if (!loginOk) return;
 
 	// ─── O login devolveu algum cookie? ────────────────────────────
+	// Se a resposta tem accessToken no body JSON, a API usa auth por body/header
+	// (padrão SPA/mobile moderno) — ausência de cookie NÃO é vulnerabilidade.
+	// Só marca como preocupação se nem cookie nem token-no-body existem.
 	if (resposta.setCookies.length === 0) {
+		if (resposta.accessToken) {
+			motor.registrar({
+				id: 'cookies-padrao-usado',
+				categoria: 'cookies',
+				descricao: 'API devolve token no body JSON (padrão mobile/SPA, sem cookies)',
+				gravidade: 'baixa',
+				passou: true,
+				detalhes: 'Padrão legítimo — a análise de cookies HttpOnly/Secure/SameSite não se aplica aqui.',
+			});
+			return;
+		}
 		motor.registrar({
 			id: 'cookies-nenhum',
 			categoria: 'cookies',
-			descricao: 'Login retornou pelo menos um Set-Cookie',
-			gravidade: 'media',
+			descricao: 'Login devolveu algo (token em cookie ou body)',
+			gravidade: 'alta',
 			passou: false,
 			detalhes:
-				'Nenhum Set-Cookie na resposta. Se você usa refresh token, ele DEVE vir em cookie HttpOnly, não em JSON.',
+				'Login não devolveu nem Set-Cookie nem accessToken no body — fluxo quebrado.',
 		});
 		return;
 	}

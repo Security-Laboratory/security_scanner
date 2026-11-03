@@ -35,6 +35,9 @@ const REMEDIACOES = {
 	'cookies-nenhum':
 		'Se você usa refresh token, envie-o via cookie `HttpOnly` no `Set-Cookie`. Nunca coloque refresh token no body JSON — JS malicioso via XSS lê o body.',
 
+	'cookies-padrao-usado':
+		'Nenhuma ação necessária. API moderna que usa body JSON pra tokens é padrão aceito (especialmente pra apps mobile). As proteções equivalentes a HttpOnly/Secure/SameSite ficam no armazenamento do cliente (ex: Secure Enclave + HTTPS pinning).',
+
 	'cookies-httponly':
 		'No Express: `res.cookie(\'nome\', valor, { httpOnly: true, ... })`. O atributo `HttpOnly` impede `document.cookie` de ler — bloqueia roubo por XSS.',
 
@@ -96,6 +99,19 @@ const REMEDIACOES = {
 
 	'sessao-logout-revoga':
 		'CRÍTICO: logout não invalida o refresh no servidor. Basta apagar o cookie do cliente não é suficiente — o token continua ativo. Marque o refresh como revogado numa tabela server-side (Redis ou banco).',
+
+	// ─── AUTORIZAÇÃO ─────────────────────────────────────────────────
+	'autz-preparacao':
+		'Login prévio falhou. Verifique credenciais no .env.',
+
+	'autz-sem-token':
+		'CRÍTICO: rota protegida está pública (aceita sem Bearer). Adicione o atributo `[Authorize]` no controller/action, ou verifique configuração de middleware JwtBearer.',
+
+	'autz-com-token-valido':
+		'Rota rejeitou Bearer válido. Causas comuns: (1) scope do token não cobre essa rota (ex: token "setup" tentando acessar rota de "produtor"); (2) rota exige HMAC request signing além do Bearer; (3) outra proteção customizada. Investigue o log do backend.',
+
+	'autz-token-adulterado':
+		'CRÍTICO: servidor aceita JWT com assinatura inválida. Está usando `jwt.decode()` em vez de `jwt.verify()`, ou configurou JwtBearer com `ValidateIssuerSigningKey = false`. Corrija imediatamente — qualquer atacante forja tokens.',
 
 	// ─── ATAQUES ─────────────────────────────────────────────────────
 	'ataque-none-preparacao':

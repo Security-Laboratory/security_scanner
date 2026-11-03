@@ -30,7 +30,9 @@ async function auditarRede(alvo, motor) {
 	// ─── UMA requisição, todos os outros testes em cima dela ─────
 	let resposta;
 	try {
-		resposta = await coletarResposta(alvo.baseUrl + alvo.rotas.protegida);
+		resposta = await coletarResposta(alvo.baseUrl + alvo.rotas.protegida, {
+			headersPadrao: alvo.headersPadrao,
+		});
 	} catch (erro) {
 		// Servidor inatingível: registra 1 achado crítico e desiste dos demais.
 		// Não faz sentido rodar "tem HSTS?" se nem o servidor responde.

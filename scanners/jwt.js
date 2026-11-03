@@ -7,7 +7,7 @@
 //   - quebrarJWT(token)         → { header, payload, assinaturaB64 }
 //   - auditarJWT(alvo, motor)   → função orquestradora (roda todos os testes)
 
-import { coletarResposta } from '../utils/http.js';
+import { fazerLogin } from '../utils/login.js';
 
 /**
  * Base64URL é Base64 padrão com duas trocas + padding opcional:
@@ -63,11 +63,7 @@ async function auditarJWT(alvo, motor) {
 	// ─── 1. Login pra pegar o token ─────────────────────────
 	let resposta;
 	try {
-		resposta = await coletarResposta(alvo.baseUrl + alvo.rotas.login, {
-			metodo: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(alvo.credenciais),
-		});
+		resposta = await fazerLogin(alvo);
 	} catch (erro) {
 		motor.registrar({
 			id: 'jwt-login-inatingivel',
@@ -80,25 +76,21 @@ async function auditarJWT(alvo, motor) {
 		return;
 	}
 
-	// ─── 2. Body é JSON válido? ─────────────────────────────
-	let body;
-	try {
-		body = JSON.parse(resposta.corpo);
-	} catch {
+	// ─── 2. Login retornou JSON válido? ─────────────────────
+	if (resposta.erro) {
 		motor.registrar({
 			id: 'jwt-body-json',
 			categoria: 'jwt',
-			descricao: '/login devolve JSON válido',
+			descricao: '/login respondeu 2xx com JSON válido',
 			gravidade: 'alta',
 			passou: false,
-			detalhes: `Body não é JSON: ${resposta.corpo.slice(0, 80)}`,
+			detalhes: `Login respondeu ${resposta.status}: ${resposta.corpo.slice(0, 120)}`,
 		});
 		return;
 	}
 
 	// ─── 3. Achou um token no body? ─────────────────────────
-	// Aceito nomes comuns: accessToken, access_token, token.
-	const token = body.accessToken || body.access_token || body.token;
+	const token = resposta.accessToken;
 	if (!token || typeof token !== 'string') {
 		motor.registrar({
 			id: 'jwt-nao-encontrado',

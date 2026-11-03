@@ -6,9 +6,16 @@ async function coletarResposta(url, opcoes = {}) {
   const metodo = opcoes.metodo || 'GET';
   const inicio = Date.now();
 
+  // Mescla headers padrão (opcoes.headersPadrao) com os do request.
+  // Headers do request têm prioridade — permite override pontual.
+  const headersFinais = {
+    ...(opcoes.headersPadrao || {}),
+    ...(opcoes.headers || {}),
+  };
+
   const resposta = await fetch(url, {
     method: metodo,
-    headers: opcoes.headers || {},
+    headers: headersFinais,
     body: opcoes.body,
     redirect: 'manual'  // não segue redirects — a gente quer VER o 301/302
   });

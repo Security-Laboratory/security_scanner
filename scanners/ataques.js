@@ -8,6 +8,7 @@
 
 import { createHmac } from 'node:crypto';
 import { coletarResposta } from '../utils/http.js';
+import { fazerLogin } from '../utils/login.js';
 import { WORDLIST } from '../utils/wordlist.js';
 
 /**
@@ -49,11 +50,7 @@ async function atacarAlgNone(alvo, motor) {
 	// Pega um token real pra manipular
 	let respLogin;
 	try {
-		respLogin = await coletarResposta(alvo.baseUrl + alvo.rotas.login, {
-			metodo: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(alvo.credenciais),
-		});
+		respLogin = await fazerLogin(alvo);
 	} catch (erro) {
 		motor.registrar({
 			id: 'ataque-none-preparacao',
@@ -66,13 +63,7 @@ async function atacarAlgNone(alvo, motor) {
 		return;
 	}
 
-	let tokenReal;
-	try {
-		const body = JSON.parse(respLogin.corpo);
-		tokenReal = body.accessToken || body.access_token || body.token;
-	} catch {
-		tokenReal = null;
-	}
+	const tokenReal = respLogin.accessToken;
 	if (!tokenReal) {
 		motor.registrar({
 			id: 'ataque-none-preparacao',
@@ -144,11 +135,7 @@ async function bruteForceHMAC(alvo, motor) {
 	// Precisa do token real primeiro
 	let respLogin;
 	try {
-		respLogin = await coletarResposta(alvo.baseUrl + alvo.rotas.login, {
-			metodo: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(alvo.credenciais),
-		});
+		respLogin = await fazerLogin(alvo);
 	} catch (erro) {
 		motor.registrar({
 			id: 'ataque-brute-preparacao',
@@ -161,13 +148,7 @@ async function bruteForceHMAC(alvo, motor) {
 		return;
 	}
 
-	let tokenReal;
-	try {
-		const body = JSON.parse(respLogin.corpo);
-		tokenReal = body.accessToken || body.access_token || body.token;
-	} catch {
-		tokenReal = null;
-	}
+	const tokenReal = respLogin.accessToken;
 	if (!tokenReal) return;
 
 	const [headerB64, payloadB64, assinaturaReal] = tokenReal.split('.');
