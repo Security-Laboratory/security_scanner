@@ -12,6 +12,11 @@ yarn-error.log*
 .env.local
 .env.*.local
 
+# Par de chaves RSA do scanner (gerado na primeira run, usado nas seguintes)
+.keypair.pem
+chave-privada.pem
+chave-publica.txt
+
 # Relatórios gerados pelo scanner
 relatorios/
 *.report.md

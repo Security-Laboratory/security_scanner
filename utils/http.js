@@ -3,7 +3,7 @@
  * Não julga — só coleta.
  */
 async function coletarResposta(url, opcoes = {}) {
-  const metodo = opcoes.metodo || 'GET';
+  const metodo = opcoes.metodo || 'POST';
   const inicio = Date.now();
 
   // Mescla headers padrão (opcoes.headersPadrao) com os do request.
@@ -13,12 +13,39 @@ async function coletarResposta(url, opcoes = {}) {
     ...(opcoes.headers || {}),
   };
 
+  // Se `assinarComSegredo` foi passado, calcula HMAC do body e adiciona
+  // os 3 headers X-Ev3-* exigidos pelo backend em rotas sensíveis.
+  // Importado dinâmico pra evitar dependência circular (assinatura usa http).
+  if (opcoes.assinarComSegredo) {
+    const { assinarRequisicao } = await import('./assinatura.js');
+    const sigHeaders = assinarRequisicao(opcoes.body || '', opcoes.assinarComSegredo);
+    Object.assign(headersFinais, sigHeaders);
+  }
+
+  if (process.env.DEBUG_SIGN === '1') {
+    console.log('[http] →', metodo, url);
+    const headersSafe = {};
+    for (const [k, v] of Object.entries(headersFinais)) {
+      if (/^authorization$/i.test(k)) {
+        headersSafe[k] = v.slice(0, 20) + '... (mascarado)';
+      } else {
+        headersSafe[k] = v;
+      }
+    }
+    console.log('  headers:', JSON.stringify(headersSafe, null, 2));
+    if (opcoes.body) console.log('  body:', opcoes.body);
+  }
+
   const resposta = await fetch(url, {
     method: metodo,
     headers: headersFinais,
     body: opcoes.body,
     redirect: 'manual'  // não segue redirects — a gente quer VER o 301/302
   });
+
+  if (process.env.DEBUG_SIGN === '1') {
+    console.log('[http] ← status', resposta.status, resposta.statusText);
+  }
 
   const duracao = Date.now() - inicio;
 

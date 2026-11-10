@@ -1,21 +1,27 @@
 // Scanner de AUTORIZAÇÃO — testa se o Bearer token é realmente validado
-// na rota protegida. Três cenários:
-//   1. Sem Authorization → servidor deve recusar (401/403)
-//   2. Bearer VÁLIDO → servidor deve aceitar (2xx)
-//   3. Bearer ADULTERADO (assinatura trocada) → servidor deve recusar (401)
+// na rota protegida.
 //
-// Isso prova que:
-//   - Rota não é acidentalmente pública
-//   - JwtBearer middleware ESTÁ ativo
-//   - JwtBearer realmente VALIDA a assinatura (não só decoda)
+// A rota /api/Empresa/ListarEmpresa é POST e exige:
+//   - Authorization: Bearer <jwt>
+//   - HMAC request signing (X-Ev3-Timestamp, X-Ev3-Nonce, X-Ev3-Signature)
+//   - Body JSON: { emailUsuario: "..." }
+//
+// 3 cenários:
+//   1. Sem Bearer, COM HMAC         → servidor deve recusar (401/403)
+//   2. Bearer VÁLIDO + HMAC válido   → servidor deve aceitar (2xx)
+//   3. Bearer ADULTERADO + HMAC OK  → servidor deve recusar (401)
+//
+// HMAC fixo em todos os testes pra ISOLAR o que a gente testa (autorização
+// de Bearer, não de assinatura).
 
 import { coletarResposta } from '../utils/http.js';
 import { fazerLogin } from '../utils/login.js';
 
 async function auditarAutorizacao(alvo, motor) {
 	const urlProtegida = alvo.baseUrl + alvo.rotas.protegida;
+	const corpo = typeof alvo.bodyProtegida === 'function' ? alvo.bodyProtegida() : '{}';
 
-	// ─── Loga pra ter um token válido ─────────────────────────
+	// ─── Preparação: login pra obter JWT + sessionHmacSecret ───
 	let sessao;
 	try {
 		sessao = await fazerLogin(alvo);
@@ -23,19 +29,32 @@ async function auditarAutorizacao(alvo, motor) {
 		motor.registrar({
 			id: 'autz-preparacao',
 			categoria: 'autorizacao',
-			descricao: 'Login prévio pra pegar token de teste',
+			descricao: 'Login prévio pra pegar token + sessionHmacSecret',
 			gravidade: 'critica',
 			passou: false,
 			detalhes: erro.message,
 		});
 		return;
 	}
-	if (!sessao.accessToken) return;
+	if (!sessao.accessToken || !sessao.sessionHmacSecret) {
+		motor.registrar({
+			id: 'autz-preparacao',
+			categoria: 'autorizacao',
+			descricao: 'Login devolveu accessToken + sessionHmacSecret',
+			gravidade: 'critica',
+			passou: false,
+			detalhes: 'Resposta de login não trouxe os campos necessários pra autorizar os testes seguintes.',
+		});
+		return;
+	}
 
-	// ─── Teste 1: sem Authorization → deve recusar ────────────
+	// ─── Teste 1: sem Bearer (mas com HMAC válido) → deve recusar ───
 	const semAuth = await coletarResposta(urlProtegida, {
-		metodo: 'GET',
+		metodo: 'POST',
+		headers: { 'content-type': 'application/json' },
 		headersPadrao: alvo.headersPadrao,
+		body: corpo,
+		assinarComSegredo: sessao.sessionHmacSecret,
 	});
 	const bloqueiaSemToken = semAuth.status === 401 || semAuth.status === 403;
 	motor.registrar({
@@ -46,51 +65,66 @@ async function auditarAutorizacao(alvo, motor) {
 		passou: bloqueiaSemToken,
 		detalhes: bloqueiaSemToken
 			? undefined
-			: `⚠️ Rota protegida devolveu ${semAuth.status} SEM Bearer. Pode estar PÚBLICA sem querer.`,
+			: `⚠️ Rota protegida devolveu ${semAuth.status} SEM Bearer — pode estar pública sem querer.`,
 	});
 
-	// ─── Teste 2: Bearer válido → deve aceitar ────────────────
+	// ─── Teste 2: Bearer válido + HMAC válido → deve aceitar ──────
 	const comAuth = await coletarResposta(urlProtegida, {
-		metodo: 'GET',
-		headers: { authorization: `Bearer ${sessao.accessToken}` },
+		metodo: 'POST',
+		headers: {
+			'content-type': 'application/json',
+			authorization: `Bearer ${sessao.accessToken}`,
+		},
 		headersPadrao: alvo.headersPadrao,
+		body: corpo,
+		assinarComSegredo: sessao.sessionHmacSecret,
 	});
 	const aceitaValido = comAuth.status >= 200 && comAuth.status < 300;
 	motor.registrar({
 		id: 'autz-com-token-valido',
 		categoria: 'autorizacao',
-		descricao: `Rota protegida aceita Bearer válido (recebeu ${comAuth.status})`,
+		descricao: `Rota protegida aceita Bearer + HMAC válidos (recebeu ${comAuth.status})`,
 		gravidade: 'alta',
 		passou: aceitaValido,
 		detalhes: aceitaValido
 			? undefined
-			: `Rota devolveu ${comAuth.status} mesmo com Bearer válido. Pode ser scope insuficiente (nosso token tem scope "setup") ou outra proteção (ex: HMAC request signing).`,
+			: `Rota devolveu ${comAuth.status}. Possíveis causas: (1) scope insuficiente (nosso token tem scope "setup"), (2) outra proteção customizada, (3) body esperado diferente de "${corpo}".`,
 	});
 
-	// ─── Teste 3: Bearer ADULTERADO → deve recusar ────────────
-	// Pega o JWT real e flipa 1 caractere da assinatura. Se o servidor
-	// VERIFICA a assinatura, não vai bater e devolve 401.
-	// Se o servidor só DECODIFICA (bug clássico), aceita a adulteração.
+	// ─── Teste 3: Bearer ADULTERADO + HMAC válido → deve recusar ──
+	// Flipa 1 caractere da assinatura do JWT. HMAC do request continua OK.
 	const partes = sessao.accessToken.split('.');
 	const assinaturaAdulterada =
 		partes[2].slice(0, -1) + (partes[2].slice(-1) === 'A' ? 'B' : 'A');
 	const tokenAdulterado = `${partes[0]}.${partes[1]}.${assinaturaAdulterada}`;
 
 	const comAuthRuim = await coletarResposta(urlProtegida, {
-		metodo: 'GET',
-		headers: { authorization: `Bearer ${tokenAdulterado}` },
+		metodo: 'POST',
+		headers: {
+			'content-type': 'application/json',
+			authorization: `Bearer ${tokenAdulterado}`,
+		},
 		headersPadrao: alvo.headersPadrao,
+		body: corpo,
+		assinarComSegredo: sessao.sessionHmacSecret,
 	});
 	const rejeitaAdulterado = comAuthRuim.status === 401 || comAuthRuim.status === 403;
+	// Diagnóstico sincero: só podemos afirmar "servidor VALIDA assinatura"
+	// se o teste 2 passou (200). Se o 2 também deu 403, não dá pra distinguir.
+	const diagnosticoConclusivo = aceitaValido;
 	motor.registrar({
 		id: 'autz-token-adulterado',
 		categoria: 'autorizacao',
-		descricao: `Rota protegida REJEITA token com assinatura adulterada (recebeu ${comAuthRuim.status})`,
+		descricao: diagnosticoConclusivo
+			? `Rota REJEITA token com assinatura adulterada (recebeu ${comAuthRuim.status})`
+			: `Rota rejeitou token adulterado (${comAuthRuim.status}), mas também rejeitou token válido — não conclusivo`,
 		gravidade: 'critica',
-		passou: rejeitaAdulterado,
-		detalhes: rejeitaAdulterado
-			? undefined
-			: `⚠️ VULNERÁVEL: servidor aceitou token com assinatura inválida (status ${comAuthRuim.status}). Está só decodificando o JWT, não validando. Qualquer um forja tokens.`,
+		passou: rejeitaAdulterado && diagnosticoConclusivo,
+		detalhes: !rejeitaAdulterado
+			? `⚠️ VULNERÁVEL: servidor aceitou token com assinatura inválida (status ${comAuthRuim.status}).`
+			: !diagnosticoConclusivo
+				? 'Teste inconclusivo — o teste 2 (Bearer válido) precisa passar pra isolarmos.'
+				: undefined,
 	});
 }
 

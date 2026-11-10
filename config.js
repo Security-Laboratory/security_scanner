@@ -10,24 +10,45 @@ import { HOSTS } from './rotas-empresa.js';
 // Troque aqui pra escolher qual host atacar nesta rodada:
 const HOST_ATIVO = HOSTS.evda;
 
-// ─── Chave pública pro login ───────────────────────────────────
-// A API exige `publicKey` no body do login. Duas formas de fornecer:
-//   1. Via .env (PUBLIC_KEY = Base64 do DER SPKI) — útil pra reproduzir
-//      exatamente o que o scanner mandou no Postman.
-//   2. Gerada em memória a cada run — simula um device novo.
+// ─── Par de chaves RSA pro login ──────────────────────────────
+// A API exige `publicKey` no body do login. Precisamos da PRIVADA pra
+// decriptar o sessionHmacSecret que o servidor manda cifrado com a nossa pública.
 //
-// FORMATO CRÍTICO: Base64 do DER (SPKI) direto, SEM embrulho PEM.
-// Formato visto em:
-//   ev3_app_vendas_promoter/android/.../SecurityModule.kt:39-42
-//     Base64.encodeToString(kp.public.encoded, Base64.DEFAULT)
-// Se mandar PEM com "-----BEGIN", o parser do backend quebra.
+// Persistência: salvamos o keypair em .keypair.pem (gitignored) depois do
+// primeiro login bem-sucedido. Isso é essencial porque o servidor faz
+// DEVICE BINDING — cacheia a pub key por IMEI. Keypair diferente = decrypt
+// falha. Com persistência, o mesmo IMEI usa sempre o mesmo keypair.
+//
+// Pra RESETAR (ex: usar IMEI novo, ou reset manual no server): apagar
+// o arquivo .keypair.pem e rodar de novo.
+//
+// FORMATO CRÍTICO da pubkey: Base64 do DER (SPKI) direto, SEM embrulho PEM.
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createPrivateKey, createPublicKey } from 'node:crypto';
 
+const CAMINHO_KEYPAIR = '.keypair.pem';
+
+let privateKey;
 let publicKeyBase64;
-if (process.env.PUBLIC_KEY) {
-	publicKeyBase64 = process.env.PUBLIC_KEY;
-} else {
-	const { publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+
+if (existsSync(CAMINHO_KEYPAIR)) {
+	// Carrega do disco
+	const pem = readFileSync(CAMINHO_KEYPAIR, 'utf-8');
+	privateKey = createPrivateKey({ key: pem, format: 'pem' });
+	const publicKey = createPublicKey(privateKey);
 	publicKeyBase64 = publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+	console.log(`[config] Keypair carregado de ${CAMINHO_KEYPAIR}`);
+} else {
+	// Gera novo
+	const keyPair = generateKeyPairSync('rsa', { modulusLength: 2048 });
+	privateKey = keyPair.privateKey;
+	publicKeyBase64 = keyPair.publicKey
+		.export({ type: 'spki', format: 'der' })
+		.toString('base64');
+	// Salva pra reusar
+	const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+	writeFileSync(CAMINHO_KEYPAIR, pem, 'utf-8');
+	console.log(`[config] Keypair novo gerado e salvo em ${CAMINHO_KEYPAIR}`);
 }
 
 const ALVO = {
@@ -59,6 +80,19 @@ const ALVO = {
 		usuario: process.env.APP_USER,
 		senha: process.env.APP_PASS,
 	},
+
+	// Body que o scanner manda nas rotas protegidas com HMAC signing.
+	// /api/Empresa/ListarEmpresa espera { emailUsuario: string }.
+	// Vem de: ev3_app_vendas_promoter/lib/.../ListaEmpresaRequest.dart
+	bodyProtegida: () =>
+		JSON.stringify({
+			emailUsuario: process.env.APP_EMAIL || process.env.USER_LOGIN,
+		}),
+
+	// Chave privada RSA (KeyObject) que casa com a publicKey enviada no login.
+	// Usada pra decriptar o sessionHmacSecret que vem criptografado com a pub key.
+	// Veja: utils/login.js + ev3_app_vendas_promoter/.../SecurityModule.kt:70-92
+	privateKey,
 
 	// Headers que o gateway EV3 espera em TODA requisição.
 	// Vistos em: ev3_app_vendas_promoter/lib/WebService/Services/dio_client.dart:55
@@ -92,5 +126,19 @@ if (faltam.length > 0) {
 	console.error('');
 	process.exit(1);
 }
+
+// ─── Banner de config efetiva ────────────────────────────────
+// Mostra o que o scanner realmente está usando. Se você mudou algo no .env
+// e não vê a mudança aqui, o Node não carregou — veja --env-file e nomes.
+console.log('');
+console.log('── Config efetiva ──');
+console.log(`  Host         : ${ALVO.baseUrl}`);
+console.log(`  USER_LOGIN   : ${ALVO.loginPayload.nmUsuario}`);
+console.log(`  APP_IMEI     : ${ALVO.loginPayload.imei}`);
+console.log(`  APP_VERSION  : ${ALVO.loginPayload.appVersion}`);
+console.log(`  APP_CLIENT   : ${ALVO.headersPadrao['x-ev3-client']}`);
+console.log(`  APP_EMAIL    : ${ALVO.emailParaRefresh}`);
+console.log(`  pub key      : ${publicKeyBase64.slice(0, 40)}...`);
+console.log('');
 
 export default ALVO;

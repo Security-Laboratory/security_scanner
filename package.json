@@ -8,6 +8,10 @@
     "start": "node index.js",
     "dev": "node --watch index.js",
     "scan": "node --env-file=.env index.js",
+    "reset-device": "node --env-file=.env utils/reset-device.js",
+    "gerar-chaves": "node utils/gerar-par-chaves.js",
+    "descriptar": "node utils/descriptar-sessao.js",
+    "testar-rota": "node --env-file=.env utils/testar-rota-protegida.js",
     "lint": "eslint ."
   },
   "author": "",

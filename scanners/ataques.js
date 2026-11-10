@@ -83,7 +83,7 @@ async function atacarAlgNone(alvo, motor) {
 	let respAtaque;
 	try {
 		respAtaque = await coletarResposta(alvo.baseUrl + alvo.rotas.protegida, {
-			metodo: 'GET',
+			metodo: 'POST',
 			headers: { authorization: `Bearer ${tokenForjado}` },
 		});
 	} catch (erro) {

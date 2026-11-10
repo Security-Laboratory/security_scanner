@@ -7,14 +7,16 @@
 //     e roda VÁRIOS testes em cima da mesma resposta.
 
 import { coletarResposta } from '../utils/http.js';
+import { fazerLogin } from '../utils/login.js';
 
 /**
  * Auditoria completa de rede.
- * Faz 1 requisição no alvo e roda TODOS os testes de infra em cima dela.
+ * Loga primeiro pra ter Bearer + sessionHmacSecret, depois faz 1 POST
+ * autenticado na rota protegida e roda TODOS os testes de infra em cima
+ * dos headers que voltam.
  */
 async function auditarRede(alvo, motor) {
 	// ─── Teste 1: URL usa HTTPS? ─────────────────────────────
-	// Não precisa nem de requisição — dá pra ver só olhando a string.
 	const usaHttps = alvo.baseUrl.startsWith('https://');
 	motor.registrar({
 		id: 'rede-https',
@@ -27,12 +29,30 @@ async function auditarRede(alvo, motor) {
 			: `Alvo em ${alvo.baseUrl.split('://')[0]}://. Todo tráfego (incluindo tokens JWT) viaja em texto plano — qualquer um na mesma rede lê.`,
 	});
 
-	// ─── UMA requisição, todos os outros testes em cima dela ─────
+	// ─── Preparação: login pra ter Bearer + sessionHmacSecret ───
+	// A rota protegida é POST com HMAC. Sem credenciais, só vemos 401/403 do
+	// gateway e perdemos os headers que o backend real retornaria.
+	let sessao = null;
+	try {
+		sessao = await fazerLogin(alvo);
+	} catch {
+		// Login falhou — vamos requisitar sem auth mesmo (fallback).
+	}
+
+	// ─── UMA requisição autenticada, todos os testes em cima ──
 	let resposta;
 	try {
-		resposta = await coletarResposta(alvo.baseUrl + alvo.rotas.protegida, {
+		const opcoes = {
+			metodo: 'POST',
+			headers: { 'content-type': 'application/json' },
 			headersPadrao: alvo.headersPadrao,
-		});
+			body: typeof alvo.bodyProtegida === 'function' ? alvo.bodyProtegida() : '{}',
+		};
+		if (sessao?.accessToken && sessao?.sessionHmacSecret) {
+			opcoes.headers.authorization = `Bearer ${sessao.accessToken}`;
+			opcoes.assinarComSegredo = sessao.sessionHmacSecret;
+		}
+		resposta = await coletarResposta(alvo.baseUrl + alvo.rotas.protegida, opcoes);
 	} catch (erro) {
 		// Servidor inatingível: registra 1 achado crítico e desiste dos demais.
 		// Não faz sentido rodar "tem HSTS?" se nem o servidor responde.
